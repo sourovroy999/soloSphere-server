@@ -135,12 +135,7 @@ async function run() {
       res.send(result)
     })
 
-    app.post('/bid',async(req,res)=>{
-      const bidData=req.body
-      const result=await bidsCollection.insertOne(bidData)
-
-      res.send(result)
-    })
+   
 
     //get all jobs posted by user
 
@@ -184,6 +179,32 @@ async function run() {
       res.send(result)
     })
 
+    //save a bid data in db
+     app.post('/bid',async(req,res)=>{
+
+      const bidData=req.body
+      
+      //check if its a duplicate request
+
+      const query={
+        email: bidData.email,
+        jobId: bidData.jobId,
+      }
+
+
+      const alreadyApplied=await bidsCollection.findOne(query)
+      console.log(alreadyApplied);
+      if(alreadyApplied){
+
+        return res
+        .status(400)
+        .send('you have already places a bid on the job')
+      }
+      
+      const result=await bidsCollection.insertOne(bidData)
+       res.send(result)
+    })
+
     //get all bids for a user by email from db
      app.get('/my-bids/:email', verifyToken, async(req,res)=>{
       const email=req.params.email
@@ -216,6 +237,53 @@ async function run() {
 
       const result=await bidsCollection.updateOne(query, updateDoc)
       res.send(result)
+    })
+
+     //get all jobs data from db for pagination
+    app.get('/all-jobs',async(req,res)=>{
+
+      const size=parseInt(req.query.size)
+      const page=parseInt(req.query.page) -1 
+      const filter=req.query.filter
+      console.log(size,page);
+      const sort=req.query.sort
+      const search=req.query.search
+
+
+
+      let query={
+      job_title:{$regex:search, $options:'i'}
+      }
+      if(filter) query.category=filter
+
+      let options={}
+      if(sort) options={sort : {deadline: sort === 'asc' ? 1 : -1}}
+      
+        const result=await jobsCollection
+        .find(query, options)
+        .skip(page * size)
+        .limit(size)
+        .toArray(); 
+        
+
+        res.send(result)
+    })
+
+     //get all jobs data count
+    app.get('/jobs-count',async(req,res)=>{
+        const filter=req.query.filter
+        const search=req.query.search
+
+         let query={
+      job_title:{$regex:search, $options:'i'}
+      }
+      if(filter) query.category=filter
+      
+
+        const count=await jobsCollection.countDocuments(query)
+        
+
+        res.send({count})
     })
 
 
